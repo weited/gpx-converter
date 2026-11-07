@@ -1,8 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HashRouter, Navigate, Route, Routes } from 'react-router';
-import { Layout } from './Layout.js';
-import { ConverterPage } from './pages/ConverterPage.js';
+import { Layout } from '@/Layout';
+import { ConverterPage } from '@/pages/ConverterPage';
 import './style.css';
 
 // HashRouter so the static build works on any host without server-side rewrites.

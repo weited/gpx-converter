@@ -1,4 +1,11 @@
+import { ChevronDown, RotateCcw, Table2 } from 'lucide-react';
 import type { CsvParseOptions, LengthUnit, SpeedUnit } from '../../core/index.js';
+import { SelectField } from '@/components/Field';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 /** Form state: every field is a string so inputs stay controlled; empty means "auto". */
 export interface CsvFormValues {
@@ -56,16 +63,16 @@ export function toCsvOptions(v: CsvFormValues): CsvParseOptions {
 
 type ColumnField = 'lat' | 'lon' | 'position' | 'ele' | 'time' | 'speed' | 'course' | 'name' | 'groupBy';
 
-const COLUMN_FIELDS: { key: ColumnField; label: string }[] = [
-  { key: 'lat', label: 'Latitude column' },
-  { key: 'lon', label: 'Longitude column' },
-  { key: 'position', label: 'Combined "lat,lon" column' },
-  { key: 'ele', label: 'Elevation column' },
-  { key: 'time', label: 'Time column' },
-  { key: 'speed', label: 'Speed column' },
-  { key: 'course', label: 'Heading column' },
-  { key: 'name', label: 'Name column' },
-  { key: 'groupBy', label: 'Split tracks by column' },
+const COLUMN_FIELDS: { key: ColumnField; label: string; wide?: boolean }[] = [
+  { key: 'lat', label: 'Latitude' },
+  { key: 'lon', label: 'Longitude' },
+  { key: 'position', label: 'Combined "lat,lon"', wide: true },
+  { key: 'ele', label: 'Elevation' },
+  { key: 'time', label: 'Time' },
+  { key: 'speed', label: 'Speed' },
+  { key: 'course', label: 'Heading' },
+  { key: 'name', label: 'Name' },
+  { key: 'groupBy', label: 'Split tracks by' },
 ];
 
 interface Props {
@@ -75,58 +82,104 @@ interface Props {
 
 export function CsvOptionsForm({ value, onChange }: Props) {
   const set = <K extends keyof CsvFormValues>(key: K, v: CsvFormValues[K]) => onChange({ ...value, [key]: v });
+  const changed = (Object.keys(DEFAULT_CSV_FORM) as (keyof CsvFormValues)[]).filter((k) => value[k] !== DEFAULT_CSV_FORM[k]).length;
 
   return (
-    <details className="options">
-      <summary>CSV options</summary>
-      <div className="grid">
-        <label>
-          Rows become
-          <select value={value.mode} onChange={(e) => set('mode', e.target.value as CsvFormValues['mode'])}>
-            <option value="track">a track</option>
-            <option value="waypoints">waypoints</option>
-          </select>
-        </label>
-        <label>
-          Delimiter
-          <select value={value.delimiter} onChange={(e) => set('delimiter', e.target.value)}>
-            <option value="">auto-detect</option>
-            <option value=",">comma ,</option>
-            <option value=";">semicolon ;</option>
-            <option value={'\t'}>tab</option>
-            <option value="|">pipe |</option>
-          </select>
-        </label>
-        <label>
-          Elevation unit
-          <select value={value.altitudeUnit} onChange={(e) => set('altitudeUnit', e.target.value as CsvFormValues['altitudeUnit'])}>
-            <option value="">auto</option>
-            <option value="m">meters</option>
-            <option value="ft">feet</option>
-          </select>
-        </label>
-        <label>
-          Speed unit
-          <select value={value.speedUnit} onChange={(e) => set('speedUnit', e.target.value as CsvFormValues['speedUnit'])}>
-            <option value="">auto</option>
-            <option value="m/s">m/s</option>
-            <option value="km/h">km/h</option>
-            <option value="kn">knots</option>
-            <option value="mph">mph</option>
-          </select>
-        </label>
-        {COLUMN_FIELDS.map(({ key, label }) => (
-          <label key={key}>
-            {label}
-            <input placeholder="auto" value={value[key]} onChange={(e) => set(key, e.target.value)} />
-          </label>
-        ))}
+    <Collapsible className="group/csv">
+      <div className="flex items-center gap-2">
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="-mx-2 flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-medium outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          >
+            <Table2 className="size-4 text-muted-foreground" />
+            CSV parsing
+            {changed > 0 && <Badge variant="secondary">{changed} changed</Badge>}
+            <ChevronDown className="ml-auto size-4 text-muted-foreground transition-transform group-data-[state=open]/csv:rotate-180" />
+          </button>
+        </CollapsibleTrigger>
       </div>
-      <p className="hint">
-        Columns can be a header name or a 0-based index. Leave blank to auto-detect from headers like <code>lat</code>,{' '}
-        <code>latitude</code>, <code>lon</code>, <code>lng</code>, <code>ele</code>, <code>time</code>,{' '}
-        <code>speed</code>, <code>heading</code>. Flightradar24 exports are recognized automatically (feet, knots).
-      </p>
-    </details>
+      <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+        <div className="grid gap-4 pt-4">
+          <div className="grid grid-cols-2 gap-3">
+            <SelectField
+              label="Rows become"
+              value={value.mode}
+              onChange={(v) => set('mode', v)}
+              options={[
+                { value: 'track', label: 'A track' },
+                { value: 'waypoints', label: 'Waypoints' },
+              ]}
+            />
+            <SelectField
+              label="Delimiter"
+              value={value.delimiter}
+              onChange={(v) => set('delimiter', v)}
+              options={[
+                { value: '', label: 'Auto-detect' },
+                { value: ',', label: 'Comma ,' },
+                { value: ';', label: 'Semicolon ;' },
+                { value: '\t', label: 'Tab' },
+                { value: '|', label: 'Pipe |' },
+              ]}
+            />
+            <SelectField
+              label="Elevation unit"
+              value={value.altitudeUnit}
+              onChange={(v) => set('altitudeUnit', v)}
+              options={[
+                { value: '', label: 'Auto' },
+                { value: 'm', label: 'Meters' },
+                { value: 'ft', label: 'Feet' },
+              ]}
+            />
+            <SelectField
+              label="Speed unit"
+              value={value.speedUnit}
+              onChange={(v) => set('speedUnit', v)}
+              options={[
+                { value: '', label: 'Auto' },
+                { value: 'm/s', label: 'm/s' },
+                { value: 'km/h', label: 'km/h' },
+                { value: 'kn', label: 'Knots' },
+                { value: 'mph', label: 'mph' },
+              ]}
+            />
+          </div>
+
+          <div className="grid gap-3">
+            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Column mapping</p>
+            <div className="grid grid-cols-2 gap-3">
+              {COLUMN_FIELDS.map(({ key, label, wide }) => (
+                <div key={key} className={wide ? 'col-span-2 grid gap-1.5' : 'grid gap-1.5'}>
+                  <Label htmlFor={`csv-${key}`} className="text-xs text-muted-foreground">
+                    {label}
+                  </Label>
+                  <Input
+                    id={`csv-${key}`}
+                    className="h-8"
+                    placeholder="auto"
+                    value={value[key]}
+                    onChange={(e) => set(key, e.target.value)}
+                  />
+                </div>
+              ))}
+            </div>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              A header name or 0-based index. Blank auto-detects headers like <code>lat</code>, <code>lon</code>,{' '}
+              <code>ele</code>, <code>time</code>, <code>speed</code>, <code>heading</code>. Flightradar24 exports are
+              recognized automatically (feet, knots).
+            </p>
+          </div>
+
+          {changed > 0 && (
+            <Button variant="outline" size="sm" className="justify-self-start" onClick={() => onChange(DEFAULT_CSV_FORM)}>
+              <RotateCcw />
+              Reset CSV options
+            </Button>
+          )}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

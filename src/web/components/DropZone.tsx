@@ -1,15 +1,20 @@
+import { FileUp, FolderOpen, UploadCloud } from 'lucide-react';
 import { useRef, useState, type DragEvent } from 'react';
-import { filesFromDrop, filesFromFolderInput, type PickedFile } from '../lib/folder.js';
+import { Button } from '@/components/ui/button';
+import { filesFromDrop, filesFromFolderInput, type PickedFile } from '@/lib/folder';
+import { cn } from '@/lib/utils';
 
 interface Props {
   accept: string;
   onFiles: (files: PickedFile[]) => void;
-  title: string;
+  /** Smaller layout once files have been added. */
+  compact?: boolean;
 }
 
-export function DropZone({ accept, onFiles, title }: Props) {
+export function DropZone({ accept, onFiles, compact = false }: Props) {
   const [over, setOver] = useState(false);
   const [notice, setNotice] = useState('');
+  const fileInput = useRef<HTMLInputElement | null>(null);
   const folderInput = useRef<HTMLInputElement | null>(null);
 
   const deliver = (files: PickedFile[], fromFolder: boolean) => {
@@ -19,6 +24,8 @@ export function DropZone({ accept, onFiles, title }: Props) {
 
   const onDrag = (e: DragEvent) => {
     e.preventDefault();
+    // dragleave fires when moving onto a child; ignore it unless the pointer really left the zone.
+    if (e.type === 'dragleave' && e.currentTarget.contains(e.relatedTarget as Node | null)) return;
     setOver(e.type === 'dragenter' || e.type === 'dragover');
   };
   const onDrop = (e: DragEvent) => {
@@ -32,27 +39,61 @@ export function DropZone({ accept, onFiles, title }: Props) {
   };
 
   return (
-    <div className="drop-wrap">
-      <label
-        className={`drop${over ? ' over' : ''}`}
+    <div className="grid gap-2">
+      <div
         onDragEnter={onDrag}
         onDragOver={onDrag}
         onDragLeave={onDrag}
         onDrop={onDrop}
+        onClick={() => fileInput.current?.click()}
+        className={cn(
+          'group relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed bg-card text-center transition-all',
+          'hover:border-primary/60 hover:bg-primary/[0.03]',
+          over && 'scale-[1.01] border-primary bg-primary/5 ring-4 ring-primary/10',
+          compact ? 'gap-3 px-6 py-6 sm:flex-row sm:justify-between sm:text-left' : 'gap-4 px-6 py-14',
+        )}
       >
-        <input
-          type="file"
-          accept={accept}
-          multiple
-          hidden
-          onChange={(e) => {
-            if (e.target.files?.length) deliver(Array.from(e.target.files, (file) => ({ file, path: file.name })), false);
-            e.target.value = '';
-          }}
-        />
-        <strong>{title}</strong>
-        <span>or click to choose files</span>
-      </label>
+        <div className={cn('flex items-center gap-4', !compact && 'flex-col')}>
+          <div
+            className={cn(
+              'flex items-center justify-center rounded-full bg-primary/10 text-primary transition-transform group-hover:scale-105',
+              compact ? 'size-10' : 'size-14',
+            )}
+          >
+            <UploadCloud className={compact ? 'size-5' : 'size-7'} />
+          </div>
+          <div className="grid gap-1">
+            <p className={cn('font-medium', !compact && 'text-lg')}>
+              {over ? 'Release to add files' : compact ? 'Add more files' : 'Drop files or a folder here'}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              KML and CSV/TSV · Flightradar24 exports are detected automatically
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap justify-center gap-2" onClick={(e) => e.stopPropagation()}>
+          <Button size={compact ? 'sm' : 'default'} onClick={() => fileInput.current?.click()}>
+            <FileUp />
+            Choose files
+          </Button>
+          <Button size={compact ? 'sm' : 'default'} variant="outline" onClick={() => folderInput.current?.click()}>
+            <FolderOpen />
+            Choose folder
+          </Button>
+        </div>
+      </div>
+
+      <input
+        ref={fileInput}
+        type="file"
+        accept={accept}
+        multiple
+        hidden
+        onChange={(e) => {
+          if (e.target.files?.length) deliver(Array.from(e.target.files, (file) => ({ file, path: file.name })), false);
+          e.target.value = '';
+        }}
+      />
       <input
         type="file"
         hidden
@@ -65,11 +106,8 @@ export function DropZone({ accept, onFiles, title }: Props) {
           e.target.value = '';
         }}
       />
-      <button type="button" className="secondary folder-pick" onClick={() => folderInput.current?.click()}>
-        Choose a folder…
-      </button>
       {notice && (
-        <p className="notice" role="status">
+        <p className="text-sm text-warning" role="status">
           {notice}
         </p>
       )}
