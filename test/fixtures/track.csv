@@ -1,0 +1,5 @@
+Latitude,Longitude,Altitude,Timestamp,Track
+-33.8688,151.2093,12,2024-05-01 08:00:00,morning
+-33.8695,151.2100,20,2024-05-01 08:01:00,morning
+bad,row,,,morning
+-33.8700,151.2110,25,1714550580,evening

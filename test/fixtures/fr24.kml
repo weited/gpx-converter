@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>HO1853/DKH1853</name>
+    <Folder>
+      <name>Route</name>
+      <Placemark>
+        <name>2026-10-02 14:45:48 UTC</name>
+        <description><![CDATA[<div><div><span><b>Altitude:</b></span> <span>27,650 ft</span></div>
+<div><span><b>Speed:</b></span> <span>448 kt</span></div>
+<div><span><b>Heading:</b></span> <span>228&deg;</span></div>
+</div>]]></description>
+        <TimeStamp><when>2026-10-02T14:45:48+00:00</when></TimeStamp>
+        <Style><IconStyle><heading>228</heading></IconStyle></Style>
+        <Point><altitudeMode>absolute</altitudeMode><coordinates>118.223137,28.735519,8427.72</coordinates></Point>
+      </Placemark>
+      <Placemark>
+        <name>2026-10-02 12:49:53 UTC</name>
+        <description><![CDATA[<div><div><span><b>Altitude:</b></span> <span>0 ft</span></div>
+<div><span><b>Speed:</b></span> <span>0 kt</span></div>
+<div><span><b>Heading:</b></span> <span>110&deg;</span></div>
+</div>]]></description>
+        <TimeStamp><when>2026-10-02T12:49:53+00:00</when></TimeStamp>
+        <Style><IconStyle><heading>110</heading></IconStyle></Style>
+        <Point><altitudeMode>absolute</altitudeMode><coordinates>121.325508,31.199495,0</coordinates></Point>
+      </Placemark>
+    </Folder>
+    <Folder>
+      <name>Trail</name>
+      <Placemark>
+        <MultiGeometry><LineString><coordinates>121.325508,31.199495,0 118.223137,28.735519,0</coordinates></LineString></MultiGeometry>
+        <name>P-1</name>
+      </Placemark>
+    </Folder>
+  </Document>
+</kml>

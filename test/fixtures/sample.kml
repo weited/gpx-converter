@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+  <Document>
+    <name>Weekend Hike</name>
+    <Folder>
+      <Placemark>
+        <name>Trailhead &amp; Parking</name>
+        <description>Start here</description>
+        <Point><coordinates>151.2093,-33.8688,12</coordinates></Point>
+      </Placemark>
+      <Placemark>
+        <name>Main Trail</name>
+        <LineString>
+          <coordinates>
+            151.2093,-33.8688,12 151.2100,-33.8695,20
+            151.2110,-33.8700,25
+          </coordinates>
+        </LineString>
+      </Placemark>
+    </Folder>
+    <Placemark>
+      <name>Recorded</name>
+      <gx:Track>
+        <when>2024-05-01T08:00:00Z</when>
+        <when>2024-05-01T08:01:00Z</when>
+        <gx:coord>151.2 -33.8 10</gx:coord>
+        <gx:coord>151.201 -33.801 11</gx:coord>
+      </gx:Track>
+    </Placemark>
+    <Placemark>
+      <name>Area</name>
+      <Polygon><outerBoundaryIs><LinearRing>
+        <coordinates>151.0,-33.0 151.1,-33.0 151.1,-33.1 151.0,-33.0</coordinates>
+      </LinearRing></outerBoundaryIs></Polygon>
+    </Placemark>
+  </Document>
+</kml>
