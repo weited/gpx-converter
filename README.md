@@ -49,6 +49,7 @@ Without `npm link`, run `node dist/cli.js …` or `npm run cli -- …`.
 | `--force` | Overwrite existing outputs (refused by default) |
 | `-q, --quiet` | No summary output |
 | `-r, --recursive` | Folder inputs: also convert files in subfolders (the folder structure is recreated under `--out-dir`) |
+| `--prefer csv\|kml` | When `name.csv` and `name.kml` are in the same folder (one Flightradar24 flight), convert only this one |
 | `--gpx-version 1.0\|1.1` | 1.0 (default): native `<speed>`/`<course>`. 1.1: speed/heading in Garmin TrackPointExtension |
 | `-m, --mode track\|waypoints` | CSV: rows form one track (default) or become waypoints |
 | `--delimiter <char>` | CSV: delimiter; auto-detects `,` `;` tab `\|` |
@@ -73,6 +74,8 @@ Drop files onto the page, adjust CSV options, download the GPX. Conversion runs 
 
 To convert a whole folder, drop the folder onto the page or click **Choose a folder…**. Every `.kml`, `.csv` and `.tsv` file in it and its subfolders is added. Hidden files and other file types are skipped.
 
+**When a flight has both CSV and KML** works like the CLI's `--prefer`. Choose **Only convert the CSV** to get one GPX per flight; the skipped files stay in the list, greyed out. Changing the choice updates the list right away, so you don't need to drop the files again.
+
 The UI is React 19 with React Router (`HashRouter`, so the static build needs no server rewrites). To add a page, create a component in `src/web/pages/`, add a `<Route>` in `src/web/main.tsx`, and add a link to `NAV` in `src/web/Layout.tsx`.
 
 ## Flightradar24 exports
@@ -85,6 +88,13 @@ to-gpx 1002_SHA_CAN_HO1853.kml 1002_SHA_CAN_HO1853.csv --out-dir gpx/
 ```
 
 Each becomes a single track; every point has time, altitude (feet converted to meters), speed (knots converted to m/s) and heading. From the KML, the `Route` points are used and the duplicate `Trail` lines are skipped. When two inputs would produce the same output name, the source extension is kept (`.kml.gpx` / `.csv.gpx`).
+
+Both files of a flight give the same points; only the track name differs. Importing both would add each flight twice to a footprint app, so for batches convert just one. The CSV is the better choice: it's about 20× smaller, and its speed and heading come from plain columns, not from text parsed out of the KML's HTML descriptions. For example:
+
+```bash
+to-gpx ~/flights -r --prefer csv --out-dir gpx/
+# → one gpx/<flight>.gpx per flight; KMLs are used only where a flight has no CSV
+```
 
 Output is GPX 1.0 by default, because it has native `<speed>` and `<course>` fields. If an app needs GPX 1.1, use `--gpx-version 1.1` (or "GPX 1.1" in the web app); speed and heading are then written in a Garmin TrackPointExtension.
 

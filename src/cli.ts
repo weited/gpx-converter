@@ -5,6 +5,7 @@ import { Command, InvalidArgumentError } from 'commander';
 import {
   convert,
   gpxFilename,
+  findPairedDuplicates,
   isConvertibleFilename,
   uniqueGpxFilenames,
   ConversionError,
@@ -43,6 +44,7 @@ interface CliOptions {
   force?: boolean;
   quiet?: boolean;
   recursive?: boolean;
+  prefer?: InputFormat;
 }
 
 function choice<T extends string>(allowed: readonly T[]) {
@@ -134,6 +136,11 @@ program
   .version('1.0.0')
   .argument('<inputs...>', 'input .kml / .csv files or folders of them (use "-" for stdin)')
   .option('-r, --recursive', 'folders: also convert files in subfolders (mirrored under --out-dir)')
+  .option(
+    '--prefer <format>',
+    'when name.csv and name.kml sit side by side (e.g. one Flightradar24 flight), convert only this one: csv | kml',
+    choice(['csv', 'kml'] as const),
+  )
   .option('-o, --output <file>', 'output file (single input only)')
   .option('-d, --out-dir <dir>', 'directory for output files (default: next to each input)')
   .option('--stdout', 'write GPX to stdout instead of a file')
@@ -171,13 +178,28 @@ Examples:
   $ to-gpx *.kml *.csv --out-dir gpx/
   $ to-gpx exports/ --out-dir gpx/      # every .kml/.csv/.tsv in the folder
   $ to-gpx exports/ -r --out-dir gpx/   # including subfolders
+  $ to-gpx exports/ -r --prefer csv     # one GPX per flight when both CSV and KML exist
   $ cat track.csv | to-gpx - --stdout > track.gpx
   $ to-gpx flight.kml flight.csv      # Flightradar24 exports are detected automatically
   $ to-gpx flight.csv --gpx-version 1.1`,
   )
   .action(async (args: string[], opts: CliOptions) => {
     if (opts.output && opts.stdout) program.error('--output and --stdout are mutually exclusive');
-    const { jobs, errors } = await expandInputs(args, opts.recursive ?? false);
+    const log = (msg: string) => {
+      if (!opts.quiet) process.stderr.write(msg + '\n');
+    };
+    const expanded = await expandInputs(args, opts.recursive ?? false);
+    const { errors } = expanded;
+
+    // --prefer: of a same-named CSV/KML pair (one Flightradar24 flight), convert only one.
+    const resolved = expanded.jobs.filter((j) => j.input !== '-').map((j) => path.resolve(j.input));
+    const skipped = findPairedDuplicates(resolved, opts.prefer);
+    const jobs = expanded.jobs.filter((j) => j.input === '-' || !skipped.has(path.resolve(j.input)));
+    for (const j of expanded.jobs) {
+      const kept = j.input !== '-' && skipped.get(path.resolve(j.input));
+      if (kept) log(`${j.input}: skipped (using ${path.basename(kept)} instead)`);
+    }
+
     if (opts.output && jobs.length > 1) {
       program.error('--output can only be used with a single input; use --out-dir for multiple files');
     }
@@ -197,9 +219,6 @@ Examples:
       name: opts.name,
       desc: opts.desc,
       groupBy: opts.groupBy,
-    };
-    const log = (msg: string) => {
-      if (!opts.quiet) process.stderr.write(msg + '\n');
     };
 
     let failures = errors.length;

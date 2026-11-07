@@ -58,7 +58,7 @@ h1 { margin: 0 0 4px; font-size: 28px; }
 .drop-wrap .drop { align-self: stretch; }
 .notice { margin: 0; font-size: 13px; color: var(--muted); }
 
-.output-options { margin-top: 16px; }
+.output-options { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px 24px; }
 .output-options label { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
 .options { margin: 16px 0; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
 .options summary { cursor: pointer; font-weight: 600; }
@@ -77,6 +77,7 @@ code { font-size: 12px; }
   padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
 }
 .file .info { min-width: 0; flex: 1; }
+.file.skipped { opacity: .6; }
 .file .fname { font-weight: 600; overflow-wrap: anywhere; }
 .file .meta { font-size: 13px; color: var(--muted); }
 .file .meta.ok { color: var(--ok); }

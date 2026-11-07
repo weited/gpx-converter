@@ -82,6 +82,38 @@ export function isConvertibleFilename(filename: string): boolean {
   return file.includes('.') && (FOLDER_EXTENSIONS as readonly string[]).includes(ext ?? '');
 }
 
+/** Which file of a same-named CSV/KML pair to convert; `undefined` converts both. */
+export type PreferFormat = InputFormat | undefined;
+
+/**
+ * For each `dir/name.csv` (or `.tsv`) + `dir/name.kml` pair — e.g. the two Flightradar24
+ * exports of one flight — return the path to drop when `prefer` is set, mapped to the
+ * path kept in its place. Files without a counterpart are never dropped.
+ */
+export function findPairedDuplicates(paths: string[], prefer: PreferFormat): Map<string, string> {
+  const skipped = new Map<string, string>();
+  if (!prefer) return skipped;
+  const kindOf = (p: string): InputFormat | undefined => {
+    const ext = p.toLowerCase().split('.').pop();
+    return ext === 'kml' ? 'kml' : ext === 'csv' || ext === 'tsv' ? 'csv' : undefined;
+  };
+  const byStem = new Map<string, { kml: string[]; csv: string[] }>();
+  for (const p of paths) {
+    const kind = kindOf(p);
+    if (!kind) continue;
+    const stem = p.replace(/\\/g, '/').replace(/\.[^./]+$/, '');
+    const group = byStem.get(stem) ?? { kml: [], csv: [] };
+    group[kind].push(p);
+    byStem.set(stem, group);
+  }
+  for (const group of byStem.values()) {
+    const kept = group[prefer][0];
+    if (!kept) continue;
+    for (const p of group[prefer === 'csv' ? 'kml' : 'csv']) skipped.set(p, kept);
+  }
+  return skipped;
+}
+
 /** Replace the extension of a filename with `.gpx`. */
 export function gpxFilename(filename: string): string {
   return `${baseName(filename)}.gpx`;

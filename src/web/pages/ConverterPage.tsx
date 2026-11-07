@@ -1,5 +1,12 @@
 import { useMemo, useState } from 'react';
-import { convert, uniqueGpxFilenames, type ConvertResult, type GpxVersion } from '../../core/index.js';
+import {
+  convert,
+  findPairedDuplicates,
+  uniqueGpxFilenames,
+  type ConvertResult,
+  type GpxVersion,
+  type PreferFormat,
+} from '../../core/index.js';
 import { CsvOptionsForm, DEFAULT_CSV_FORM, toCsvOptions, type CsvFormValues } from '../components/CsvOptionsForm.js';
 import { DropZone } from '../components/DropZone.js';
 import { downloadText } from '../lib/download.js';
@@ -11,7 +18,11 @@ interface SourceFile {
   text: string;
 }
 
-type Outcome = { source: SourceFile; outName: string } & ({ result: ConvertResult } | { error: string });
+type Outcome = { source: SourceFile } & (
+  | { outName: string; result: ConvertResult }
+  | { outName: string; error: string }
+  | { skippedFor: string }
+);
 
 let nextId = 1;
 
@@ -19,13 +30,21 @@ export function ConverterPage() {
   const [files, setFiles] = useState<SourceFile[]>([]);
   const [csvForm, setCsvForm] = useState<CsvFormValues>(DEFAULT_CSV_FORM);
   const [gpxVersion, setGpxVersion] = useState<GpxVersion>('1.0');
+  const [prefer, setPrefer] = useState<PreferFormat>(undefined);
 
   // Re-run conversions whenever files or options change; conversion is synchronous and fast.
   const outcomes = useMemo<Outcome[]>(() => {
     const csv = toCsvOptions(csvForm);
-    const outNames = uniqueGpxFilenames(files.map((f) => f.name));
-    return files.map((source, i) => {
-      const outName = outNames[i];
+    const skipped = findPairedDuplicates(
+      files.map((f) => f.name),
+      prefer,
+    );
+    const active = files.filter((f) => !skipped.has(f.name));
+    const outNames = new Map(uniqueGpxFilenames(active.map((f) => f.name)).map((n, i) => [active[i], n]));
+    return files.map((source): Outcome => {
+      const skippedFor = skipped.get(source.name);
+      if (skippedFor) return { source, skippedFor };
+      const outName = outNames.get(source)!;
       try {
         return {
           source,
@@ -36,7 +55,7 @@ export function ConverterPage() {
         return { source, outName, error: err instanceof Error ? err.message : String(err) };
       }
     });
-  }, [files, csvForm, gpxVersion]);
+  }, [files, csvForm, gpxVersion, prefer]);
 
   const addFiles = async (list: PickedFile[]) => {
     const added = await Promise.all(
@@ -45,7 +64,9 @@ export function ConverterPage() {
     setFiles((prev) => [...prev, ...added]);
   };
 
-  const successful = outcomes.filter((o): o is Outcome & { result: ConvertResult } => 'result' in o);
+  const successful = outcomes.filter(
+    (o): o is Extract<Outcome, { result: ConvertResult }> => 'result' in o,
+  );
 
   const downloadAll = async () => {
     for (const o of successful) {
@@ -71,12 +92,23 @@ export function ConverterPage() {
             <option value="1.1">GPX 1.1 (speed in Garmin extension)</option>
           </select>
         </label>
+        <label>
+          When a flight has both CSV and KML
+          <select
+            value={prefer ?? 'both'}
+            onChange={(e) => setPrefer(e.target.value === 'both' ? undefined : (e.target.value as PreferFormat))}
+          >
+            <option value="both">Convert both</option>
+            <option value="csv">Only convert the CSV</option>
+            <option value="kml">Only convert the KML</option>
+          </select>
+        </label>
       </div>
       <CsvOptionsForm value={csvForm} onChange={setCsvForm} />
 
       <section className="results" aria-live="polite">
         {outcomes.map((o) => (
-          <div className="file" key={o.source.id}>
+          <div className={`file${'skippedFor' in o ? ' skipped' : ''}`} key={o.source.id}>
             <div className="info">
               <div className="fname">{o.source.name}</div>
               {'result' in o ? (
@@ -94,8 +126,10 @@ export function ConverterPage() {
                     </ul>
                   )}
                 </>
-              ) : (
+              ) : 'error' in o ? (
                 <div className="meta err">{o.error}</div>
+              ) : (
+                <div className="meta">Skipped: using {o.skippedFor} instead</div>
               )}
             </div>
             {'result' in o && (

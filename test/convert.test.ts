@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { DOMParser } from '@xmldom/xmldom';
 import { describe, expect, it } from 'vitest';
-import { convert, detectFormat, parseCsv, parseTimeValue, tokenizeCsv, uniqueGpxFilenames, isConvertibleFilename, ConversionError } from '../src/core/index.js';
+import { convert, detectFormat, parseCsv, parseTimeValue, tokenizeCsv, uniqueGpxFilenames, isConvertibleFilename, findPairedDuplicates, ConversionError } from '../src/core/index.js';
 
 const fixture = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
 
@@ -173,5 +173,26 @@ describe('isConvertibleFilename', () => {
     expect(['._a.kml', '.hidden.csv', 'e.gpx', 'notes.txt', 'kml'].map(isConvertibleFilename)).toEqual([
       false, false, false, false, false,
     ]);
+  });
+});
+
+describe('findPairedDuplicates', () => {
+  const paths = ['a/flight.csv', 'a/flight.kml', 'b/flight.kml', 'a/other.tsv', 'a/other.kml', 'c/only.kml'];
+
+  it('converts everything when no preference is set', () => {
+    expect(findPairedDuplicates(paths, undefined).size).toBe(0);
+  });
+
+  it('skips the KML of a same-named pair in the same folder when CSV is preferred', () => {
+    expect(findPairedDuplicates(paths, 'csv')).toEqual(
+      new Map([
+        ['a/flight.kml', 'a/flight.csv'],
+        ['a/other.kml', 'a/other.tsv'],
+      ]),
+    );
+  });
+
+  it('skips the CSV when KML is preferred', () => {
+    expect([...findPairedDuplicates(paths, 'kml').keys()]).toEqual(['a/flight.csv', 'a/other.tsv']);
   });
 });
