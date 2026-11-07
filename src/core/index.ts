@@ -68,6 +68,20 @@ export function convert(content: string, options: ConvertOptions = {}): ConvertR
   };
 }
 
+/** Extensions picked up when a whole folder is converted. */
+export const FOLDER_EXTENSIONS = ['kml', 'csv', 'tsv'] as const;
+
+/**
+ * Whether a file found while scanning a folder should be converted: a supported
+ * extension and not a hidden/system file (e.g. macOS `._foo.kml` resource forks).
+ */
+export function isConvertibleFilename(filename: string): boolean {
+  const file = filename.split(/[\\/]/).pop() ?? filename;
+  if (file.startsWith('.')) return false;
+  const ext = file.toLowerCase().split('.').pop();
+  return file.includes('.') && (FOLDER_EXTENSIONS as readonly string[]).includes(ext ?? '');
+}
+
 /** Replace the extension of a filename with `.gpx`. */
 export function gpxFilename(filename: string): string {
   return `${baseName(filename)}.gpx`;

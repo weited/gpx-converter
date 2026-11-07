@@ -3,6 +3,7 @@ import { convert, uniqueGpxFilenames, type ConvertResult, type GpxVersion } from
 import { CsvOptionsForm, DEFAULT_CSV_FORM, toCsvOptions, type CsvFormValues } from '../components/CsvOptionsForm.js';
 import { DropZone } from '../components/DropZone.js';
 import { downloadText } from '../lib/download.js';
+import type { PickedFile } from '../lib/folder.js';
 
 interface SourceFile {
   id: number;
@@ -37,8 +38,10 @@ export function ConverterPage() {
     });
   }, [files, csvForm, gpxVersion]);
 
-  const addFiles = async (list: File[]) => {
-    const added = await Promise.all(list.map(async (f) => ({ id: nextId++, name: f.name, text: await f.text() })));
+  const addFiles = async (list: PickedFile[]) => {
+    const added = await Promise.all(
+      list.map(async ({ file, path }) => ({ id: nextId++, name: path, text: await file.text() })),
+    );
     setFiles((prev) => [...prev, ...added]);
   };
 
@@ -59,7 +62,7 @@ export function ConverterPage() {
         <p className="sub">Convert KML and CSV files to GPX. Everything runs in your browser — files never leave your device.</p>
       </header>
 
-      <DropZone accept=".kml,.csv,.tsv,.txt" title="Drop .kml or .csv files here" onFiles={addFiles} />
+      <DropZone accept=".kml,.csv,.tsv,.txt" title="Drop .kml or .csv files, or a folder, here" onFiles={addFiles} />
       <div className="output-options">
         <label>
           Output format

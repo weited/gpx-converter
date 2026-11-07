@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { DOMParser } from '@xmldom/xmldom';
 import { describe, expect, it } from 'vitest';
-import { convert, detectFormat, parseCsv, parseTimeValue, tokenizeCsv, uniqueGpxFilenames, ConversionError } from '../src/core/index.js';
+import { convert, detectFormat, parseCsv, parseTimeValue, tokenizeCsv, uniqueGpxFilenames, isConvertibleFilename, ConversionError } from '../src/core/index.js';
 
 const fixture = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
 
@@ -163,6 +163,15 @@ describe('uniqueGpxFilenames', () => {
       'flight.kml.gpx',
       'flight.csv.gpx',
       'route.gpx',
+    ]);
+  });
+});
+
+describe('isConvertibleFilename', () => {
+  it('accepts kml/csv/tsv and skips hidden files and other types', () => {
+    expect(['a.kml', 'B.KML', 'dir/c.csv', 'd.tsv'].map(isConvertibleFilename)).toEqual([true, true, true, true]);
+    expect(['._a.kml', '.hidden.csv', 'e.gpx', 'notes.txt', 'kml'].map(isConvertibleFilename)).toEqual([
+      false, false, false, false, false,
     ]);
   });
 });

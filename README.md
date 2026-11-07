@@ -14,12 +14,27 @@ npm test
 
 ## CLI
 
+### Use it from any folder
+
 ```bash
-npm link             # optional: puts `to-gpx` on your PATH
+npm run build:cli    # compile src/ → dist/
+npm link             # put a global `to-gpx` command on your PATH
+```
+
+- `npm link` creates a link, not a copy. The global command runs this folder's `dist/`, so after you change the code, run `npm run build:cli` again. You don't need to link again.
+- The link is installed for the Node version that was active when you ran it. With fnm, if you switch to another Node version, `to-gpx` isn't found until you switch back or run `npm link` again.
+- To install a fixed copy that doesn't follow your edits, run `npm install -g .` instead. You'll need to reinstall after each change.
+- To remove it: `npm unlink -g gpx-converter`.
+
+### Usage
+
+```bash
 to-gpx route.kml                                   # → route.gpx next to the input
 to-gpx points.csv --mode waypoints -o pois.gpx
 to-gpx log.csv --lat Latitude --lon Longitude --time "GPS Time"
 to-gpx *.kml *.csv --out-dir gpx/
+to-gpx exports/ --out-dir gpx/                     # every .kml/.csv/.tsv in a folder
+to-gpx exports/ -r --out-dir gpx/                  # …including subfolders
 cat track.csv | to-gpx - > track.gpx               # stdin → stdout
 ```
 
@@ -33,6 +48,7 @@ Without `npm link`, run `node dist/cli.js …` or `npm run cli -- …`.
 | `-f, --format kml\|csv` | Force input format (default: from extension, then content) |
 | `--force` | Overwrite existing outputs (refused by default) |
 | `-q, --quiet` | No summary output |
+| `-r, --recursive` | Folder inputs: also convert files in subfolders (the folder structure is recreated under `--out-dir`) |
 | `--gpx-version 1.0\|1.1` | 1.0 (default): native `<speed>`/`<course>`. 1.1: speed/heading in Garmin TrackPointExtension |
 | `-m, --mode track\|waypoints` | CSV: rows form one track (default) or become waypoints |
 | `--delimiter <char>` | CSV: delimiter; auto-detects `,` `;` tab `\|` |
@@ -41,6 +57,8 @@ Without `npm link`, run `node dist/cli.js …` or `npm run cli -- …`.
 | `--alt-unit m\|ft`, `--speed-unit m/s\|km/h\|kn\|mph` | CSV: input units (converted to meters and m/s) |
 | `--group-by <col>` | CSV: start a new track whenever this column changes |
 | `--no-polygons` | KML: ignore Polygon geometry |
+
+An input can be a folder. Every `.kml`, `.csv` and `.tsv` file in it is converted. Hidden files (such as macOS `._*` files) and other file types are skipped, and subfolders are only included with `-r`. A folder with no matching files counts as a failure.
 
 Exit code is `1` if any input fails; other inputs are still converted.
 
@@ -52,6 +70,8 @@ npm run build:web    # static site in dist-web/ — host anywhere (uses relative
 ```
 
 Drop files onto the page, adjust CSV options, download the GPX. Conversion runs entirely client-side.
+
+To convert a whole folder, drop the folder onto the page or click **Choose a folder…**. Every `.kml`, `.csv` and `.tsv` file in it and its subfolders is added. Hidden files and other file types are skipped.
 
 The UI is React 19 with React Router (`HashRouter`, so the static build needs no server rewrites). To add a page, create a component in `src/web/pages/`, add a `<Route>` in `src/web/main.tsx`, and add a link to `NAV` in `src/web/Layout.tsx`.
 

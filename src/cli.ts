@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-import { access, readFile, writeFile, mkdir } from 'node:fs/promises';
+import { access, readFile, readdir, stat, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { Command, InvalidArgumentError } from 'commander';
 import {
   convert,
   gpxFilename,
+  isConvertibleFilename,
   uniqueGpxFilenames,
   ConversionError,
   parseLengthUnit,
@@ -41,6 +42,7 @@ interface CliOptions {
   polygons: boolean;
   force?: boolean;
   quiet?: boolean;
+  recursive?: boolean;
 }
 
 function choice<T extends string>(allowed: readonly T[]) {
@@ -65,6 +67,56 @@ function parseDelimiter(value: string): string {
   return d;
 }
 
+/** One file to convert. `relDir` is its subfolder inside a folder input ('' otherwise), mirrored under --out-dir. */
+interface Job {
+  input: string;
+  relDir: string;
+}
+
+/** Expand folder inputs into the convertible files they contain; plain files and "-" pass through. */
+async function expandInputs(inputs: string[], recursive: boolean): Promise<{ jobs: Job[]; errors: string[] }> {
+  const jobs: Job[] = [];
+  const errors: string[] = [];
+  const seen = new Set<string>();
+  const add = (input: string, relDir: string) => {
+    const key = input === '-' ? '-' : path.resolve(input);
+    if (seen.has(key)) return;
+    seen.add(key);
+    jobs.push({ input, relDir });
+  };
+
+  const walk = async (dir: string, relDir: string): Promise<number> => {
+    const entries = (await readdir(dir, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name));
+    let found = 0;
+    for (const entry of entries) {
+      if (entry.name.startsWith('.')) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (recursive) found += await walk(full, path.join(relDir, entry.name));
+      } else if (isConvertibleFilename(entry.name)) {
+        add(full, relDir);
+        found++;
+      }
+    }
+    return found;
+  };
+
+  for (const input of inputs) {
+    const info = input === '-' ? undefined : await stat(input).catch(() => undefined);
+    if (!info?.isDirectory()) {
+      add(input, ''); // missing files are reported when read
+      continue;
+    }
+    const found = await walk(input, '');
+    if (found === 0) {
+      errors.push(
+        `${input}: no .kml/.csv/.tsv files found${recursive ? '' : ' (use --recursive to include subfolders)'}`,
+      );
+    }
+  }
+  return { jobs, errors };
+}
+
 async function exists(p: string): Promise<boolean> {
   try {
     await access(p);
@@ -80,7 +132,8 @@ program
   .name('to-gpx')
   .description('Convert KML and CSV files to GPX (1.0 by default, or 1.1)')
   .version('1.0.0')
-  .argument('<inputs...>', 'input .kml / .csv files (use "-" for stdin)')
+  .argument('<inputs...>', 'input .kml / .csv files or folders of them (use "-" for stdin)')
+  .option('-r, --recursive', 'folders: also convert files in subfolders (mirrored under --out-dir)')
   .option('-o, --output <file>', 'output file (single input only)')
   .option('-d, --out-dir <dir>', 'directory for output files (default: next to each input)')
   .option('--stdout', 'write GPX to stdout instead of a file')
@@ -116,15 +169,18 @@ Examples:
   $ to-gpx points.csv --mode waypoints -o pois.gpx
   $ to-gpx log.csv --lat Latitude --lon Longitude --time "GPS Time"
   $ to-gpx *.kml *.csv --out-dir gpx/
+  $ to-gpx exports/ --out-dir gpx/      # every .kml/.csv/.tsv in the folder
+  $ to-gpx exports/ -r --out-dir gpx/   # including subfolders
   $ cat track.csv | to-gpx - --stdout > track.gpx
   $ to-gpx flight.kml flight.csv      # Flightradar24 exports are detected automatically
   $ to-gpx flight.csv --gpx-version 1.1`,
   )
-  .action(async (inputs: string[], opts: CliOptions) => {
-    if (opts.output && inputs.length > 1) {
+  .action(async (args: string[], opts: CliOptions) => {
+    if (opts.output && opts.stdout) program.error('--output and --stdout are mutually exclusive');
+    const { jobs, errors } = await expandInputs(args, opts.recursive ?? false);
+    if (opts.output && jobs.length > 1) {
       program.error('--output can only be used with a single input; use --out-dir for multiple files');
     }
-    if (opts.output && opts.stdout) program.error('--output and --stdout are mutually exclusive');
 
     const csv: CsvParseOptions = {
       mode: opts.mode,
@@ -146,18 +202,23 @@ Examples:
       if (!opts.quiet) process.stderr.write(msg + '\n');
     };
 
-    let failures = 0;
+    let failures = errors.length;
+    for (const e of errors) process.stderr.write(`error: ${e}\n`);
     if (opts.outDir) await mkdir(opts.outDir, { recursive: true });
 
     // Outputs that share a directory must not collide (e.g. flight.kml + flight.csv).
-    const outDirOf = (input: string) => path.resolve(opts.outDir ?? path.dirname(input));
-    const outNames = new Map<string, string>();
-    const byDir = Map.groupBy(inputs.filter((i) => i !== '-'), outDirOf);
+    const outDirOf = ({ input, relDir }: Job) => (opts.outDir ? path.join(opts.outDir, relDir) : path.dirname(input));
+    const outNames = new Map<Job, string>();
+    const byDir = Map.groupBy(
+      jobs.filter((j) => j.input !== '-'),
+      (j) => path.resolve(outDirOf(j)),
+    );
     for (const group of byDir.values()) {
-      uniqueGpxFilenames(group).forEach((name, i) => outNames.set(group[i], name));
+      uniqueGpxFilenames(group.map((j) => j.input)).forEach((name, i) => outNames.set(group[i], name));
     }
 
-    for (const input of inputs) {
+    for (const job of jobs) {
+      const { input } = job;
       const isStdin = input === '-';
       try {
         const content = isStdin ? await readStdin() : await readFile(input, 'utf8');
@@ -177,13 +238,13 @@ Examples:
           process.stdout.write(result.gpx);
           log(`${isStdin ? 'stdin' : input}: ${summary}`);
         } else {
-          const outName = outNames.get(input) ?? gpxFilename(input);
-          const outPath =
-            opts.output ?? (opts.outDir ? path.join(opts.outDir, outName) : path.join(path.dirname(input), outName));
+          const outName = outNames.get(job) ?? gpxFilename(input);
+          const outPath = opts.output ?? path.join(outDirOf(job), outName);
           if (path.resolve(outPath) === path.resolve(input)) throw new ConversionError('Output would overwrite the input');
           if (!opts.force && (await exists(outPath))) {
             throw new ConversionError(`${outPath} already exists (use --force to overwrite)`);
           }
+          if (job.relDir) await mkdir(path.dirname(outPath), { recursive: true });
           await writeFile(outPath, result.gpx, 'utf8');
           log(`${input} → ${outPath}: ${summary}`);
         }
